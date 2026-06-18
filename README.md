@@ -1,56 +1,92 @@
-# Cerebro
+# cerebro
 
-> One console to see — and secure — your whole fleet.
+One console to see and secure your whole fleet.
 
-Cerebro is a plug-and-play CLI **and** local web dashboard for managing and securing a
-fleet of Linux servers (first-class targets: **CentOS Stream 10** and **Rocky Linux 10**)
-over **Tailscale SSH**. It is **agentless** (nothing is installed on your servers),
-**inspect-first** (every change is diffed, confirmed and reversible) and
-**production-safe by default**.
+Cerebro is a single-binary CLI and local web dashboard for managing Linux
+servers over Tailscale SSH. It is agentless, inspect-first, and production-safe
+by default: every write path is meant to be diffed, confirmed, audited, and
+reversible where the underlying system allows it.
 
-```console
-$ cerebro serve          # opens the dashboard at http://127.0.0.1:7878
-$ cerebro audit          # external-exposure security audit across the fleet (JSON-able)
-$ cerebro fw status      # firewall posture per host/zone
-$ cerebro updates --security-only
+```sh
+cerebro serve
+cerebro audit
+cerebro fw status
+cerebro updates --security-only
 ```
 
-## Why
+First-class targets are CentOS Stream 10 and Rocky Linux 10 with firewalld, dnf,
+Docker/Coolify workloads, classic cron, and Tailscale SSH.
 
-Built for the sysadmin who runs a handful of production boxes and wants a single pane of
-glass for: firewall posture, what's actually reachable from the internet, Docker /
-Coolify stacks, OS & container security updates, cron jobs and Tailscale status — with
-the ability to make careful, auditable changes.
+## Install
 
-## Highlights
+From crates.io:
 
-- **Agentless over Tailscale SSH** — shells out to your system `ssh`, so your
-  `~/.ssh/config`, `known_hosts` and Tailscale identity auth just work. Detects and
-  gracefully surfaces Tailscale's periodic browser re-authentication.
-- **Firewall editor** — firewalld zones mapped onto your interfaces (public / private /
-  tailnet), with service presets, raw ports and source-restricted rich-rules, a live
-  diff, and an **auto-rollback timer** so a bad rule can't lock you out.
-- **External-exposure audit** — listening sockets vs firewall zones, SSH hardening,
-  SELinux, fail2ban/CrowdSec, pending security errata, and `0.0.0.0` Docker ports.
-- **Updates** — dnf security errata (with severity) and stale container images, with
-  guided, reboot-aware apply.
-- **Safety** — tiered actions, `--dry-run`, a global read-only switch and an append-only
-  audit log.
+```sh
+cargo install cerebro
+```
+
+Or download a static Linux binary (`x86_64` / `aarch64`) from
+[GitHub Releases](https://github.com/almeidx/cerebro/releases). Verify with the
+published SHA-256 checksums.
+
+## Quick start
+
+Create a `cerebro.toml` inventory, then start the local dashboard:
+
+```sh
+cerebro serve
+```
+
+The dashboard binds to `127.0.0.1` and opens a browser tab. It is a local
+control-plane UI; use SSH or Tailscale forwarding rather than exposing it
+directly.
+
+Headless commands stay scriptable:
+
+```sh
+cerebro audit --json
+cerebro fw status
+cerebro updates --security-only
+```
+
+## What It Checks
+
+- Firewall posture across public, private, and tailnet interfaces.
+- External exposure from listening sockets, Docker-published ports, and zone
+  assignments.
+- SSH hardening, SELinux, fail2ban/CrowdSec signals, Tailscale status, and host
+  reachability.
+- dnf security errata, reboot state, stale container images, cron jobs, and
+  configuration drift snapshots.
+
+## Safety Model
+
+Cerebro shells out to system `ssh`, so your OpenSSH config, known hosts,
+ssh-agent, and Tailscale SSH identity are reused. Managed hosts do not need a
+daemon.
+
+Mutation paths are explicit. Firewall edits use service presets, raw ports, and
+source-restricted rich rules, then show a diff and use an auto-rollback timer so
+a bad rule does not lock you out. Bulk actions are serial/canary by default,
+with per-host results and a global read-only switch.
 
 ## Status
 
 Early development. See [SPEC.md](SPEC.md) for the full design and roadmap.
 
-## Building
+## Development
 
-```console
-cargo build --release
+Requires a stable Rust toolchain (Rust 1.82 or newer). SQLite is compiled in,
+so no system SQLite dependency is required.
+
+```sh
 cargo test
-cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets -- -D warnings
+cargo fmt --check
 ```
 
-Requires a stable Rust toolchain (≥ 1.82). SQLite is compiled in (no system dependency).
+CI runs the test suite and builds the static musl release targets. Merging a
+release PR publishes `x86_64-unknown-linux-musl` and
+`aarch64-unknown-linux-musl` binaries with SHA-256 checksums.
 
-## License
-
-MIT OR Apache-2.0.
+License: Apache-2.0.

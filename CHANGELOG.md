@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## [0.1.1-alpha.3] - 2026-06-18
+
+- ci: build macos release artifacts
+- deps: Update actions/checkout action to v7 (#15)
+
+
 ## [0.1.1-alpha.2] - 2026-06-18
 
 - deps: Update patch/minor dependencies (#12)

@@ -72,11 +72,11 @@ with per-host results and a global read-only switch.
 
 ## Status
 
-Early development. See [SPEC.md](SPEC.md) for the full design and roadmap.
+Early development; interfaces and workflows may still change.
 
 ## Development
 
-Requires a stable Rust toolchain (Rust 1.82 or newer). SQLite is compiled in,
+Requires a stable Rust toolchain (Rust 1.96 or newer). SQLite is compiled in,
 so no system SQLite dependency is required.
 
 ```sh

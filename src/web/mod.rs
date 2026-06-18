@@ -1,6 +1,6 @@
 //! Server-rendered local dashboard.
 //!
-//! A single-binary axum 0.7 application that renders the in-memory fleet cache as
+//! A single-binary axum 0.8 application that renders the in-memory fleet cache as
 //! plain HTML via minijinja. Everything is intentionally local-only: the templates
 //! carry a persistent "do not expose" banner and an optional read-only badge so an
 //! operator can never mistake this for a hardened, internet-facing control plane.
@@ -164,7 +164,7 @@ async fn style() -> impl IntoResponse {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(overview))
-        .route("/host/:name", get(host_detail))
+        .route("/host/{name}", get(host_detail))
         .route("/audit", get(audit))
         .route("/healthz", get(healthz))
         .route("/assets/style.css", get(style))

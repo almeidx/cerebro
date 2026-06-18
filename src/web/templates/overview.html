@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="30">
+    <title>Cerebro — fleet</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">Cerebro</div>
+    <nav class="nav">
+        <a href="/">Fleet</a>
+        <a href="/audit">Audit</a>
+    </nav>
+    {% if read_only %}<span class="badge readonly">read-only</span>{% endif %}
+</header>
+<div class="banner">localhost control plane — do not expose</div>
+<main class="content">
+    <h1>Fleet</h1>
+    {% if hosts %}
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Host</th>
+                <th>Groups</th>
+                <th>Health</th>
+                <th>Security updates</th>
+                <th>Audit</th>
+                <th>Containers</th>
+                <th>Last polled</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for host in hosts %}
+            <tr>
+                <td><a href="/host/{{ host.name }}">{{ host.name }}</a></td>
+                <td>
+                    {% for group in host.groups %}<span class="tag">{{ group }}</span>{% endfor %}
+                </td>
+                <td><span class="health health-{{ host.health }}">{{ host.health }}</span></td>
+                <td>{{ host.security_update_count }}</td>
+                <td>
+                    {% if host.max_severity %}
+                    <span class="chip sev-{{ host.max_severity }}">{{ host.max_severity }}</span>
+                    {% else %}<span class="muted">—</span>{% endif %}
+                </td>
+                <td>{{ host.container_count }}</td>
+                <td class="muted">{{ host.last_polled or "never" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hosts in the inventory yet.</p>
+    {% endif %}
+</main>
+</body>
+</html>

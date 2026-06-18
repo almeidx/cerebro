@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="30">
+    <title>Cerebro — audit</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">Cerebro</div>
+    <nav class="nav">
+        <a href="/">Fleet</a>
+        <a href="/audit">Audit</a>
+    </nav>
+    {% if read_only %}<span class="badge readonly">read-only</span>{% endif %}
+</header>
+<div class="banner">localhost control plane — do not expose</div>
+<main class="content">
+    <h1>Fleet audit</h1>
+    {% if rows %}
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Host</th>
+                <th>Finding</th>
+                <th>Category</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td><span class="chip sev-{{ row.finding.severity }}">{{ row.finding.severity }}</span></td>
+                <td><a href="/host/{{ row.host }}">{{ row.host }}</a></td>
+                <td>
+                    {{ row.finding.title }}
+                    <div class="muted mono">{{ row.finding.id }}</div>
+                </td>
+                <td>{{ row.finding.category }}</td>
+                <td>
+                    {{ row.finding.detail }}
+                    {% if row.finding.recommendation %}<div class="muted"><strong>Fix:</strong> {{ row.finding.recommendation }}</div>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No findings across the fleet.</p>
+    {% endif %}
+</main>
+</body>
+</html>

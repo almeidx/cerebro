@@ -1,0 +1,32 @@
+# Cerebro inventory. Copy to ~/.config/cerebro/cerebro.toml and edit.
+# Hosts are reached over Tailscale SSH (as root, no password) by default.
+
+[settings]
+poll_interval_secs = 45      # background dashboard refresh cadence
+ssh_connect_timeout = 8
+rollback_timer_secs = 60     # firewall auto-revert window
+read_only = false            # global safe-mode: true blocks ALL writes
+parallel_apply = false       # serial/canary applies by default
+bind_port = 7878
+
+[[host]]
+name = "coolify-main"
+address = "coolify-main"     # tailnet hostname (or IP) ssh connects to
+groups = ["prod", "coolify", "public-facing"]
+# Map each interface to a role so the firewall editor and audit understand
+# what is reachable from the public internet vs the private/tailnet links.
+[host.interfaces]
+eth0 = "public"              # Hetzner public NIC
+eth1 = "private"            # Hetzner private vSwitch between cloud servers
+tailscale0 = "tailnet"
+
+[[host]]
+name = "coolify-child-01"
+address = "coolify-child-01"
+user = "root"
+port = 22
+groups = ["prod", "coolify-child"]
+[host.interfaces]
+eth0 = "public"
+eth1 = "private"
+tailscale0 = "tailnet"

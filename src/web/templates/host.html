@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="30">
+    <title>Cerebro — {{ host.name }}</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">Cerebro</div>
+    <nav class="nav">
+        <a href="/">Fleet</a>
+        <a href="/audit">Audit</a>
+    </nav>
+    {% if read_only %}<span class="badge readonly">read-only</span>{% endif %}
+</header>
+<div class="banner">localhost control plane — do not expose</div>
+<main class="content">
+    <h1>{{ host.name }}</h1>
+    <p>
+        <span class="health health-{{ host.health }}">{{ host.health }}</span>
+        {% for group in host.groups %}<span class="tag">{{ group }}</span>{% endfor %}
+        {% if max_severity %}<span class="chip sev-{{ max_severity }}">{{ max_severity }}</span>{% endif %}
+    </p>
+    {% if host.error %}<p class="error">{{ host.error }}</p>{% endif %}
+    {# auth_url is constrained to a safe https:// URL at the source (see ssh::detect_reauth
+       and the tailscale parser); autoescaping additionally escapes the attribute value. #}
+    {% if host.auth_url %}<p class="error">Needs re-authentication: <a href="{{ host.auth_url }}" rel="noopener noreferrer">{{ host.auth_url }}</a></p>{% endif %}
+
+    <section>
+        <h2>Facts</h2>
+        {% if host.facts %}
+        <dl class="facts">
+            <dt>OS</dt><dd>{{ host.facts.os.pretty_name or host.facts.os.id }}</dd>
+            <dt>Kernel</dt><dd>{{ host.facts.kernel }}</dd>
+            <dt>SELinux</dt><dd>{{ host.facts.selinux }}</dd>
+            {% if host.facts.uptime_secs %}<dt>Uptime (s)</dt><dd>{{ host.facts.uptime_secs }}</dd>{% endif %}
+        </dl>
+        {% if host.facts.interfaces %}
+        <table class="grid">
+            <thead><tr><th>Interface</th><th>Role</th><th>Addresses</th></tr></thead>
+            <tbody>
+                {% for iface in host.facts.interfaces %}
+                <tr>
+                    <td>{{ iface.name }}</td>
+                    <td>{{ iface.role }}</td>
+                    <td>{{ iface.addresses | join(", ") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% else %}<p class="muted">No facts collected.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Firewall</h2>
+        {% if host.firewall %}
+        <p class="muted">Backend: {{ host.firewall.backend }}</p>
+        {% for zone in host.firewall.zones %}
+        <div class="card">
+            <h3>{{ zone.name }}{% if zone.target %} <span class="muted">({{ zone.target }})</span>{% endif %}</h3>
+            {% if zone.interfaces %}<p><strong>Interfaces:</strong> {{ zone.interfaces | join(", ") }}</p>{% endif %}
+            {% if zone.sources %}<p><strong>Sources:</strong> {{ zone.sources | join(", ") }}</p>{% endif %}
+            {% if zone.services %}<p><strong>Services:</strong> {{ zone.services | join(", ") }}</p>{% endif %}
+            {% if zone.ports %}<p><strong>Ports:</strong>
+                {% for port in zone.ports %}<span class="tag">{{ port.port }}/{{ port.protocol }}</span>{% endfor %}
+            </p>{% endif %}
+            {% if zone.rich_rules %}
+            <ul class="mono">{% for rule in zone.rich_rules %}<li>{{ rule }}</li>{% endfor %}</ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}<p class="muted">No firewall state collected.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Containers</h2>
+        {% if host.containers %}
+        <table class="grid">
+            <thead><tr><th>Name</th><th>Image</th><th>State</th><th>Status</th><th>Ports</th><th>Health</th></tr></thead>
+            <tbody>
+                {% for c in host.containers %}
+                <tr>
+                    <td>{{ c.name }}</td>
+                    <td class="mono">{{ c.image }}</td>
+                    <td>{{ c.state }}</td>
+                    <td class="muted">{{ c.status }}</td>
+                    <td>
+                        {% for p in c.ports %}
+                        <span class="tag">{% if p.host_port %}{{ p.host_ip or "" }}{% if p.host_ip %}:{% endif %}{{ p.host_port }}→{% endif %}{{ p.container_port }}/{{ p.protocol }}</span>
+                        {% endfor %}
+                    </td>
+                    <td>{{ c.health or "—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No containers.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Cron</h2>
+        {% if host.cron %}
+        <table class="grid">
+            <thead><tr><th>User</th><th>Schedule</th><th>Command</th><th>Enabled</th></tr></thead>
+            <tbody>
+                {% for job in host.cron %}
+                <tr>
+                    <td>{{ job.user or "—" }}</td>
+                    <td class="mono">{{ job.schedule }}</td>
+                    <td class="mono">{{ job.command }}</td>
+                    <td>{% if job.enabled %}yes{% else %}<span class="muted">no</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No cron jobs.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Updates</h2>
+        {% if host.updates %}
+        <table class="grid">
+            <thead><tr><th>Package</th><th>Current</th><th>New</th><th>Repo</th><th>Errata</th></tr></thead>
+            <tbody>
+                {% for u in host.updates %}
+                <tr>
+                    <td>{{ u.name }}{% if u.arch %}.{{ u.arch }}{% endif %}</td>
+                    <td class="muted">{{ u.current_version or "—" }}</td>
+                    <td class="mono">{{ u.new_version }}</td>
+                    <td class="muted">{{ u.repo or "—" }}</td>
+                    <td>
+                        {% if u.errata %}
+                        <span class="chip sev-{{ u.errata.severity }}">{{ u.errata.advisory }} ({{ u.errata.severity }})</span>
+                        {% else %}<span class="muted">—</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No pending updates.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Listening sockets</h2>
+        {% if host.sockets %}
+        <table class="grid">
+            <thead><tr><th>Proto</th><th>Address</th><th>Port</th><th>Process</th><th>PID</th></tr></thead>
+            <tbody>
+                {% for s in host.sockets %}
+                <tr>
+                    <td>{{ s.protocol }}</td>
+                    <td class="mono">{{ s.local_addr }}</td>
+                    <td>{{ s.local_port }}</td>
+                    <td>{{ s.process or "—" }}</td>
+                    <td class="muted">{{ s.pid or "—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No listening sockets.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Tailscale</h2>
+        {% if host.tailscale %}
+        <dl class="facts">
+            <dt>State</dt><dd>{{ host.tailscale.backend_state or "unknown" }}</dd>
+            <dt>Online</dt><dd>{% if host.tailscale.online %}yes{% else %}no{% endif %}</dd>
+            {% if host.tailscale.version %}<dt>Version</dt><dd>{{ host.tailscale.version }}</dd>{% endif %}
+            {% if host.tailscale.hostname %}<dt>Hostname</dt><dd>{{ host.tailscale.hostname }}</dd>{% endif %}
+            {% if host.tailscale.addresses %}<dt>Addresses</dt><dd class="mono">{{ host.tailscale.addresses | join(", ") }}</dd>{% endif %}
+            {% if host.tailscale.routes %}<dt>Routes</dt><dd class="mono">{{ host.tailscale.routes | join(", ") }}</dd>{% endif %}
+        </dl>
+        {% else %}<p class="muted">No Tailscale status.</p>{% endif %}
+    </section>
+
+    <section>
+        <h2>Audit findings</h2>
+        {% if host.audit and host.audit.findings %}
+        {% for f in host.audit.findings %}
+        <div class="card">
+            <h3><span class="chip sev-{{ f.severity }}">{{ f.severity }}</span> {{ f.title }}</h3>
+            <p class="muted">{{ f.id }} · {{ f.category }}</p>
+            <p>{{ f.detail }}</p>
+            {% if f.recommendation %}<p><strong>Fix:</strong> {{ f.recommendation }}</p>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}<p class="muted">No findings.</p>{% endif %}
+    </section>
+</main>
+</body>
+</html>

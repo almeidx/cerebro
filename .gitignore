@@ -1,0 +1,8 @@
+/target
+.DS_Store
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+/.cerebro/
+*.rs.bk

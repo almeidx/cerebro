@@ -81,7 +81,8 @@ impl Config {
 
     /// Read, parse and validate a `cerebro.toml` from disk.
     pub fn load(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path)?;
+        let contents =
+            std::fs::read_to_string(path).map_err(|source| Error::config_read(path, source))?;
         let config = Self::from_toml_str(&contents)?;
         config.validate()?;
         Ok(config)
@@ -329,9 +330,17 @@ port = 2222
     }
 
     #[test]
-    fn load_missing_file_is_io_error() {
+    fn load_missing_file_names_the_config_path() {
         let path = Path::new("/nonexistent/cerebro/does-not-exist.toml");
-        assert!(matches!(Config::load(path), Err(Error::Io(_))));
+        let err = Config::load(path).unwrap_err();
+        let message = err.to_string();
+        match err {
+            Error::MissingConfig { path: missing } => {
+                assert_eq!(missing, path);
+                assert!(message.contains("--config PATH"));
+            }
+            other => panic!("expected MissingConfig error, got {other:?}"),
+        }
     }
 
     #[test]

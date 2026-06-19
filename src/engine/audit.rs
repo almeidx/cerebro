@@ -7,7 +7,7 @@
 
 use crate::model::{
     AuditReport, Container, Facts, Finding, FindingCategory, FirewallState, ListeningSocket,
-    OsUpdate, SelinuxMode, Severity, SshdConfig,
+    OsUpdate, Protocol, SelinuxMode, Severity, SshdConfig,
 };
 
 /// Ports that, when exposed on a wildcard address, warrant an elevated severity because
@@ -17,6 +17,10 @@ const DATABASE_PORTS: &[u16] = &[5432, 3306, 6379, 27017, 5984];
 /// The TCP port for SSH, exempt from the generic exposure check since remote management
 /// is the whole point of the tool.
 const SSH_PORT: u16 = 22;
+
+/// Tailscale's direct WireGuard listener. `tailscaled` binds this on wildcard UDP
+/// addresses by design; flagging it as a generic exposure is noisy.
+const TAILSCALE_DIRECT_PORT: u16 = 41641;
 
 /// Everything the audit needs to know about one host.
 pub struct AuditInputs<'a> {
@@ -45,28 +49,22 @@ pub fn audit_host(host: &str, inputs: &AuditInputs) -> AuditReport {
 }
 
 fn audit_exposure(sockets: &[ListeningSocket], findings: &mut Vec<Finding>) {
-    for socket in sockets {
-        if !socket.is_wildcard() || socket.local_port == SSH_PORT {
-            continue;
-        }
-        let port = socket.local_port;
+    for group in exposure_groups(sockets) {
+        let port = group.port;
         let is_database = DATABASE_PORTS.contains(&port);
         let severity = if is_database {
             Severity::Important
         } else {
             Severity::Moderate
         };
-        let process = socket.process.as_deref().unwrap_or("unknown process");
-        // Fold protocol and IP family into the id so a dual-stack (0.0.0.0 + [::]) or
-        // tcp+udp pair on the same port produces distinct, stable findings.
-        let family = if socket.local_addr.contains(':') {
-            "v6"
-        } else {
-            "v4"
-        };
+        let process = group.process_label();
+        // Fold protocol and IP family into the id so dual-stack listeners
+        // (0.0.0.0 + [::]) still produce distinct, stable findings.
+        let family = group.family.as_str();
+        let protocol = group.protocol_label();
+        let address = &group.representative().local_addr;
         let detail = format!(
-            "{} port {port} ({process}) is listening on wildcard address {}",
-            socket.protocol, socket.local_addr
+            "{protocol} port {port} ({process}) is listening on wildcard address {address}",
         );
         let recommendation = if is_database {
             Some(format!(
@@ -78,7 +76,7 @@ fn audit_exposure(sockets: &[ListeningSocket], findings: &mut Vec<Finding>) {
             ))
         };
         findings.push(Finding {
-            id: format!("exposure.{}.{family}.{port}", socket.protocol),
+            id: format!("exposure.{}.{family}.{port}", group.id_protocol()),
             title: format!("Port {port} exposed on all interfaces"),
             severity,
             category: FindingCategory::Exposure,
@@ -86,6 +84,126 @@ fn audit_exposure(sockets: &[ListeningSocket], findings: &mut Vec<Finding>) {
             recommendation,
         });
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AddressFamily {
+    V4,
+    V6,
+}
+
+impl AddressFamily {
+    fn of(socket: &ListeningSocket) -> Self {
+        if socket.local_addr.contains(':') {
+            Self::V6
+        } else {
+            Self::V4
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::V4 => "v4",
+            Self::V6 => "v6",
+        }
+    }
+}
+
+struct ExposureGroup<'a> {
+    family: AddressFamily,
+    port: u16,
+    sockets: Vec<&'a ListeningSocket>,
+}
+
+impl<'a> ExposureGroup<'a> {
+    fn new(socket: &'a ListeningSocket) -> Self {
+        Self {
+            family: AddressFamily::of(socket),
+            port: socket.local_port,
+            sockets: vec![socket],
+        }
+    }
+
+    fn matches(&self, socket: &ListeningSocket) -> bool {
+        self.family == AddressFamily::of(socket) && self.port == socket.local_port
+    }
+
+    fn representative(&self) -> &'a ListeningSocket {
+        self.sockets
+            .iter()
+            .copied()
+            .find(|socket| socket.protocol == Protocol::Tcp)
+            .unwrap_or(self.sockets[0])
+    }
+
+    fn has_protocol(&self, protocol: Protocol) -> bool {
+        self.sockets
+            .iter()
+            .any(|socket| socket.protocol == protocol)
+    }
+
+    fn id_protocol(&self) -> Protocol {
+        if self.has_protocol(Protocol::Tcp) {
+            Protocol::Tcp
+        } else {
+            Protocol::Udp
+        }
+    }
+
+    fn protocol_label(&self) -> String {
+        if self.has_protocol(Protocol::Tcp) && self.has_protocol(Protocol::Udp) {
+            "tcp/udp".to_string()
+        } else {
+            self.id_protocol().to_string()
+        }
+    }
+
+    fn process_label(&self) -> String {
+        let mut names = Vec::new();
+        for socket in &self.sockets {
+            let Some(name) = socket.process.as_deref() else {
+                continue;
+            };
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+
+        if names.is_empty() {
+            "unknown process".to_string()
+        } else {
+            names.join(", ")
+        }
+    }
+}
+
+fn exposure_groups(sockets: &[ListeningSocket]) -> Vec<ExposureGroup<'_>> {
+    let mut groups: Vec<ExposureGroup<'_>> = Vec::new();
+    for socket in sockets
+        .iter()
+        .filter(|socket| is_exposure_candidate(socket))
+    {
+        match groups.iter_mut().find(|group| group.matches(socket)) {
+            Some(group) => group.sockets.push(socket),
+            None => groups.push(ExposureGroup::new(socket)),
+        }
+    }
+    groups
+}
+
+fn is_exposure_candidate(socket: &ListeningSocket) -> bool {
+    socket.is_wildcard() && socket.local_port != SSH_PORT && !is_expected_agent_socket(socket)
+}
+
+fn is_expected_agent_socket(socket: &ListeningSocket) -> bool {
+    let Some(process) = socket.process.as_deref() else {
+        return false;
+    };
+
+    process.eq_ignore_ascii_case("cloudflared")
+        || (process.eq_ignore_ascii_case("tailscaled")
+            && socket.protocol == Protocol::Udp
+            && socket.local_port == TAILSCALE_DIRECT_PORT)
 }
 
 fn audit_ssh(sshd: Option<&SshdConfig>, findings: &mut Vec<Finding>) {
@@ -240,8 +358,16 @@ mod tests {
     }
 
     fn wildcard_socket(port: u16, process: &str) -> ListeningSocket {
+        wildcard_socket_with_protocol(port, process, Protocol::Tcp)
+    }
+
+    fn wildcard_socket_with_protocol(
+        port: u16,
+        process: &str,
+        protocol: Protocol,
+    ) -> ListeningSocket {
         ListeningSocket {
-            protocol: Protocol::Tcp,
+            protocol,
             local_addr: "0.0.0.0".to_string(),
             local_port: port,
             process: Some(process.to_string()),
@@ -425,6 +551,55 @@ mod tests {
         assert!(report.findings.iter().all(|f| !f.id.ends_with(".22")));
         let web = find(&report, "exposure.tcp.v4.8080");
         assert_eq!(web.severity, Severity::Moderate);
+    }
+
+    #[test]
+    fn expected_tailscale_and_cloudflared_listeners_are_not_flagged() {
+        let sockets = vec![
+            wildcard_socket_with_protocol(41641, "tailscaled", Protocol::Udp),
+            wildcard_socket_with_protocol(53091, "cloudflared", Protocol::Udp),
+            wildcard_socket(60123, "cloudflared"),
+        ];
+        let inputs = AuditInputs {
+            facts: None,
+            firewall: None,
+            sockets: &sockets,
+            containers: &[],
+            updates: &[],
+            sshd: None,
+        };
+        let report = audit_host("h", &inputs);
+        assert!(
+            report.findings.is_empty(),
+            "expected no findings, got {:?}",
+            report.findings
+        );
+    }
+
+    #[test]
+    fn tcp_udp_pair_on_same_wildcard_port_yields_one_finding() {
+        let sockets = vec![
+            wildcard_socket_with_protocol(443, "caddy", Protocol::Udp),
+            wildcard_socket(443, "caddy"),
+        ];
+        let inputs = AuditInputs {
+            facts: None,
+            firewall: None,
+            sockets: &sockets,
+            containers: &[],
+            updates: &[],
+            sshd: None,
+        };
+        let report = audit_host("h", &inputs);
+        let web = find(&report, "exposure.tcp.v4.443");
+        assert_eq!(web.severity, Severity::Moderate);
+        assert!(web.detail.contains("tcp/udp port 443"));
+        assert_eq!(
+            report.findings.len(),
+            1,
+            "expected one collapsed finding, got {:?}",
+            report.findings
+        );
     }
 
     #[test]

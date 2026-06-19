@@ -102,6 +102,9 @@ enum LineKind<'a> {
 fn classify(line: &str) -> LineKind<'_> {
     if let Some(rest) = line.strip_prefix('#') {
         let body = rest.trim_start();
+        if is_job_definition_placeholder(body) {
+            return LineKind::Skip;
+        }
         if looks_like_schedule(body) {
             return LineKind::Disabled(body);
         }
@@ -111,6 +114,23 @@ fn classify(line: &str) -> LineKind<'_> {
         return LineKind::Skip;
     }
     LineKind::Active
+}
+
+fn is_job_definition_placeholder(body: &str) -> bool {
+    let fields: Vec<&str> = body.split_whitespace().collect();
+    fields
+        == [
+            "*",
+            "*",
+            "*",
+            "*",
+            "*",
+            "user-name",
+            "command",
+            "to",
+            "be",
+            "executed",
+        ]
 }
 
 /// Whether a comment body is a real (commented-out) cron entry rather than prose.
@@ -315,6 +335,27 @@ PATH=/usr/lib/sysstat:/usr/sbin:/usr/sbin:/usr/bin:/sbin:/bin
         assert_eq!(jobs[0].schedule, "30 2 * * *");
         assert_eq!(jobs[0].command, "/usr/bin/maint.sh");
         assert_eq!(jobs[0].raw, "30 2 * * * root /usr/bin/maint.sh");
+    }
+
+    #[test]
+    fn etc_crontab_job_definition_example_is_skipped() {
+        let content = "\
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7)
+# |  |  |  |  |
+# *  *  *  *  * user-name  command to be executed
+0,15,30,45 7-20 * * 1-5 root /root/crons/run-renovate.sh
+";
+        let jobs = parse_etc_crontab(content);
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].user.as_deref(), Some("root"));
+        assert_eq!(jobs[0].schedule, "0,15,30,45 7-20 * * 1-5");
+        assert_eq!(jobs[0].command, "/root/crons/run-renovate.sh");
+        assert!(jobs[0].enabled);
     }
 
     #[test]

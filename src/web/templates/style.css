@@ -1,21 +1,31 @@
 :root {
-    --cerebro-bg: #0f1115;
-    --cerebro-surface: #171a21;
-    --cerebro-surface-alt: #1f2330;
-    --cerebro-border: #2a2f3a;
-    --cerebro-text: #e6e9ef;
-    --cerebro-muted: #8b93a3;
+    --cerebro-bg: #0d0f14;
+    --cerebro-bg-soft: #11141b;
+    --cerebro-surface: #161a22;
+    --cerebro-surface-alt: #1d222d;
+    --cerebro-surface-hover: #222836;
+    --cerebro-border: #283041;
+    --cerebro-border-soft: #1f2531;
+    --cerebro-text: #e7eaf0;
+    --cerebro-muted: #8a93a6;
+    --cerebro-faint: #5c6577;
     --cerebro-accent: #5b9dff;
-    --cerebro-banner: #5a3a00;
-    --cerebro-banner-text: #ffd591;
-    --cerebro-critical: #d6304a;
-    --cerebro-important: #e8782f;
+    --cerebro-accent-soft: rgba(91, 157, 255, 0.14);
+    --cerebro-banner: #3a2a05;
+    --cerebro-banner-text: #f4cf86;
+    --cerebro-banner-border: #5a4310;
+    --cerebro-critical: #e5475f;
+    --cerebro-important: #ee8a3c;
     --cerebro-moderate: #d9b126;
-    --cerebro-low: #4a9d6a;
+    --cerebro-low: #4ca977;
     --cerebro-unknown: #6b7280;
-    --cerebro-online: #4a9d6a;
-    --cerebro-warn: #e8782f;
-    --cerebro-down: #d6304a;
+    --cerebro-online: #45c07e;
+    --cerebro-warn: #ee8a3c;
+    --cerebro-down: #e5475f;
+    --cerebro-clean: #45c07e;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -25,187 +35,839 @@
 body {
     margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--cerebro-bg);
+    background:
+        radial-gradient(1200px 500px at 50% -200px, rgba(91, 157, 255, 0.07), transparent 70%),
+        var(--cerebro-bg);
     color: var(--cerebro-text);
-    line-height: 1.5;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
 }
+
+a {
+    color: var(--cerebro-accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+    background: var(--cerebro-surface-alt);
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+/* ---------------------------------------------------------------- chrome */
 
 .topbar {
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    padding: 0.75rem 1.25rem;
-    background: var(--cerebro-surface);
+    padding: 0.7rem 1.5rem;
+    background: rgba(18, 21, 28, 0.85);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--cerebro-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 700;
-    font-size: 1.15rem;
-    letter-spacing: 0.02em;
+    font-size: 1.1rem;
+    letter-spacing: 0.01em;
+    color: var(--cerebro-text);
+}
+
+.brand:hover {
+    text-decoration: none;
+}
+
+.brand-mark {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    background: conic-gradient(from 220deg, var(--cerebro-accent), #9b6bff 60%, var(--cerebro-accent));
+    box-shadow: 0 0 0 3px var(--cerebro-accent-soft);
 }
 
 .nav {
     display: flex;
-    gap: 1rem;
+    gap: 0.35rem;
 }
 
-.nav a,
-.content a {
-    color: var(--cerebro-accent);
+.nav a {
+    color: var(--cerebro-muted);
+    padding: 0.3rem 0.7rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.92rem;
+}
+
+.nav a:hover {
+    color: var(--cerebro-text);
+    background: var(--cerebro-surface-alt);
     text-decoration: none;
 }
 
-.nav a:hover,
-.content a:hover {
-    text-decoration: underline;
+.nav a.active {
+    color: var(--cerebro-text);
+    background: var(--cerebro-accent-soft);
+}
+
+.topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.badge {
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--cerebro-border);
+    color: var(--cerebro-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
 }
 
 .badge.readonly {
+    color: var(--cerebro-banner-text);
+    border-color: var(--cerebro-banner-border);
+    background: rgba(90, 67, 16, 0.25);
+}
+
+.banner {
+    padding: 0.4rem 1.5rem;
+    background: var(--cerebro-banner);
+    color: var(--cerebro-banner-text);
+    border-bottom: 1px solid var(--cerebro-banner-border);
+    font-size: 0.82rem;
+    text-align: center;
+    letter-spacing: 0.01em;
+}
+
+.content {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 1.75rem 1.5rem 5rem;
+}
+
+/* ------------------------------------------------------------- typography */
+
+h1 {
+    font-size: 1.55rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+h2 {
+    font-size: 1.05rem;
+    margin: 1.75rem 0 0.85rem;
+    letter-spacing: 0.01em;
+}
+
+h3 {
+    font-size: 0.98rem;
+    margin: 0;
+}
+
+.subtle {
+    color: var(--cerebro-muted);
+    font-size: 0.86rem;
+}
+
+.mono {
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+    font-size: 0.85em;
+}
+
+.page-head {
+    margin-bottom: 1.25rem;
+}
+
+.page-head h1 {
+    margin-bottom: 0.2rem;
+}
+
+.crumb {
+    font-size: 0.85rem;
+    color: var(--cerebro-muted);
+    margin-bottom: 0.75rem;
+}
+
+.empty {
+    border: 1px dashed var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    color: var(--cerebro-muted);
+    background: var(--cerebro-bg-soft);
+}
+
+.empty p {
+    margin: 0.25rem 0;
+}
+
+/* --------------------------------------------------------- fleet summary */
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.75rem;
+}
+
+.stat {
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.stat-num {
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.stat-of {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--cerebro-faint);
+}
+
+.stat-label {
+    font-size: 0.78rem;
+    color: var(--cerebro-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.stat-warn .stat-num {
+    color: var(--cerebro-warn);
+}
+
+.stat-bad .stat-num {
+    color: var(--cerebro-critical);
+}
+
+/* ------------------------------------------------------------- host cards */
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.host-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    color: var(--cerebro-text);
+    transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+
+.host-card:hover {
+    text-decoration: none;
+    border-color: var(--cerebro-accent);
+    background: var(--cerebro-surface-hover);
+    transform: translateY(-2px);
+}
+
+.host-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.host-name {
+    font-weight: 650;
+    font-size: 1.05rem;
+}
+
+.dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--cerebro-unknown);
+}
+
+.dot-online {
+    background: var(--cerebro-online);
+    box-shadow: 0 0 0 3px rgba(69, 192, 126, 0.18);
+}
+
+.dot-needs_reauth {
+    background: var(--cerebro-warn);
+    box-shadow: 0 0 0 3px rgba(238, 138, 60, 0.18);
+}
+
+.dot-unreachable {
+    background: var(--cerebro-down);
+    box-shadow: 0 0 0 3px rgba(229, 71, 95, 0.18);
+}
+
+.health-label {
     margin-left: auto;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cerebro-muted);
+}
+
+.health-online { color: var(--cerebro-online); }
+.health-needs_reauth { color: var(--cerebro-warn); }
+.health-unreachable { color: var(--cerebro-down); }
+
+.host-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.host-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.host-card-foot {
+    margin-top: auto;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--cerebro-border-soft);
+    font-size: 0.78rem;
+}
+
+.tag {
+    display: inline-block;
+    padding: 0.08rem 0.5rem;
+    border-radius: 4px;
+    background: var(--cerebro-surface-alt);
+    border: 1px solid var(--cerebro-border);
+    font-size: 0.76rem;
+    color: var(--cerebro-muted);
+}
+
+.count-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.count-pill.ghost {
+    background: var(--cerebro-surface-alt);
+    border: 1px solid var(--cerebro-border);
+    color: var(--cerebro-muted);
+    font-weight: 500;
+}
+
+.count-pill.clean {
+    color: var(--cerebro-clean);
+    background: rgba(69, 192, 126, 0.12);
+    border: 1px solid rgba(69, 192, 126, 0.3);
+}
+
+/* --------------------------------------------------------------- host head */
+
+.host-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.host-head-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.host-head-main h1 {
+    font-size: 1.5rem;
+}
+
+.host-head-meta {
+    align-self: center;
+}
+
+.alert {
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.9rem;
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+}
+
+.alert-bad {
+    background: rgba(229, 71, 95, 0.12);
+    border-color: rgba(229, 71, 95, 0.4);
+    color: #f6a6b2;
+}
+
+.alert-warn {
+    background: rgba(238, 138, 60, 0.12);
+    border-color: rgba(238, 138, 60, 0.4);
+    color: var(--cerebro-banner-text);
+}
+
+/* -------------------------------------------------------------------- tabs */
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    border-bottom: 1px solid var(--cerebro-border);
+    margin: 1.25rem 0 1.5rem;
+}
+
+.tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.9rem;
+    color: var(--cerebro-muted);
+    font-size: 0.92rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.tab:hover {
+    color: var(--cerebro-text);
+    background: var(--cerebro-surface);
+    text-decoration: none;
+}
+
+.tab.active {
+    color: var(--cerebro-text);
+    border-bottom-color: var(--cerebro-accent);
+}
+
+.tab-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.02rem 0.4rem;
+    border-radius: 999px;
+    background: var(--cerebro-surface-alt);
+    border: 1px solid var(--cerebro-border);
+    color: var(--cerebro-muted);
+}
+
+.tab-count.is-warn {
+    background: rgba(238, 138, 60, 0.18);
+    border-color: rgba(238, 138, 60, 0.4);
+    color: var(--cerebro-warn);
+}
+
+.tab-count.is-bad {
+    background: rgba(229, 71, 95, 0.18);
+    border-color: rgba(229, 71, 95, 0.4);
+    color: var(--cerebro-critical);
+}
+
+.panel {
+    display: none;
+    animation: fade 0.18s ease;
+}
+
+.panel.active {
+    display: block;
+}
+
+@keyframes fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ----------------------------------------------------------- overview tiles */
+
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.tile {
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.tile-label {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cerebro-muted);
+}
+
+.tile-num {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.tile-of {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--cerebro-faint);
+}
+
+.tile-sub {
+    font-size: 0.82rem;
+    color: var(--cerebro-muted);
+}
+
+.text-warn { color: var(--cerebro-warn); }
+.text-bad { color: var(--cerebro-critical); }
+.clean-text { color: var(--cerebro-clean); }
+
+.split {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; }
+}
+
+.finding-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.finding-list li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+}
+
+.finding-title {
+    font-weight: 550;
+}
+
+/* ------------------------------------------------------------- severity */
+
+.chip {
+    display: inline-block;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #0f1115;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.sev-critical { background: var(--cerebro-critical); color: #fff; }
+.sev-important { background: var(--cerebro-important); color: #1a1206; }
+.sev-moderate { background: var(--cerebro-moderate); color: #1a1500; }
+.sev-low { background: var(--cerebro-low); color: #fff; }
+.sev-unknown { background: var(--cerebro-unknown); color: #fff; }
+
+.count-pill.sev-critical { background: rgba(229, 71, 95, 0.16); color: #f1899a; }
+.count-pill.sev-important { background: rgba(238, 138, 60, 0.16); color: var(--cerebro-important); }
+.count-pill.sev-moderate { background: rgba(217, 177, 38, 0.16); color: var(--cerebro-moderate); }
+.count-pill.sev-low { background: rgba(76, 169, 119, 0.16); color: var(--cerebro-low); }
+
+.sev-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+
+/* -------------------------------------------------------- finding cards */
+
+.finding-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.finding-card {
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-left: 3px solid var(--cerebro-border);
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
+}
+
+.finding-card p {
+    margin: 0.4rem 0 0;
+}
+
+.finding-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.sevbar-critical { border-left-color: var(--cerebro-critical); }
+.sevbar-important { border-left-color: var(--cerebro-important); }
+.sevbar-moderate { border-left-color: var(--cerebro-moderate); }
+.sevbar-low { border-left-color: var(--cerebro-low); }
+.sevbar-unknown { border-left-color: var(--cerebro-unknown); }
+
+.fix {
+    font-size: 0.88rem;
+    color: var(--cerebro-text);
+}
+
+.fix strong {
+    color: var(--cerebro-clean);
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    margin-right: 0.4rem;
+}
+
+/* ------------------------------------------------------------- firewall */
+
+.zone {
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    margin: 0.75rem 0;
+}
+
+.zone-permissive {
+    border-color: rgba(238, 138, 60, 0.45);
+}
+
+.zone-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.zone-head h3 {
+    text-transform: capitalize;
+}
+
+.policy {
+    margin-left: auto;
+    font-size: 0.78rem;
     padding: 0.15rem 0.6rem;
     border-radius: 999px;
     background: var(--cerebro-surface-alt);
     border: 1px solid var(--cerebro-border);
     color: var(--cerebro-muted);
-    font-size: 0.8rem;
+}
+
+.policy-open {
+    background: rgba(238, 138, 60, 0.16);
+    border-color: rgba(238, 138, 60, 0.4);
+    color: var(--cerebro-warn);
+}
+
+.zone-scope {
+    margin: 0.4rem 0 0.8rem;
+}
+
+.zone-openings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.zone-openings-label {
+    font-size: 0.76rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    color: var(--cerebro-faint);
+    margin-right: 0.25rem;
 }
 
-.banner {
-    padding: 0.4rem 1.25rem;
-    background: var(--cerebro-banner);
-    color: var(--cerebro-banner-text);
+.opening {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--cerebro-accent-soft);
+    border: 1px solid rgba(91, 157, 255, 0.3);
+    font-size: 0.84rem;
+}
+
+.opening-detail {
+    color: var(--cerebro-muted);
+}
+
+.zone-empty {
+    color: var(--cerebro-faint);
+    font-size: 0.86rem;
+    margin: 0;
+}
+
+.rich {
+    margin-top: 0.8rem;
+    border-top: 1px solid var(--cerebro-border-soft);
+    padding-top: 0.6rem;
+}
+
+.rich summary {
+    cursor: pointer;
+    color: var(--cerebro-muted);
     font-size: 0.85rem;
-    text-align: center;
-    letter-spacing: 0.02em;
 }
 
-.content {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 1.5rem 1.25rem 4rem;
+.rich ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--cerebro-muted);
 }
 
-h1 {
-    font-size: 1.5rem;
-    margin: 0.5rem 0 1.25rem;
-}
-
-h2 {
-    font-size: 1.15rem;
-    margin: 2rem 0 0.75rem;
-    padding-bottom: 0.35rem;
-    border-bottom: 1px solid var(--cerebro-border);
-}
-
-h3 {
-    font-size: 1rem;
-    margin: 0 0 0.5rem;
-}
+/* ---------------------------------------------------------------- tables */
 
 table.grid {
     width: 100%;
     border-collapse: collapse;
     margin: 0.5rem 0;
     font-size: 0.9rem;
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    overflow: hidden;
 }
 
 table.grid th,
 table.grid td {
     text-align: left;
-    padding: 0.5rem 0.65rem;
-    border-bottom: 1px solid var(--cerebro-border);
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--cerebro-border-soft);
     vertical-align: top;
 }
 
-table.grid th {
+table.grid thead th {
+    background: var(--cerebro-bg-soft);
     color: var(--cerebro-muted);
     font-weight: 600;
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+}
+
+table.grid tbody tr:last-child td {
+    border-bottom: none;
 }
 
 table.grid tbody tr:hover {
-    background: var(--cerebro-surface);
+    background: var(--cerebro-surface-hover);
 }
 
-.tag {
+table.grid.sevbar-critical,
+tr.sevbar-critical td:first-child { box-shadow: none; }
+
+tr[class*="sevbar-"] td:first-child {
+    border-left: 3px solid transparent;
+}
+
+tr.sevbar-critical td:first-child { border-left-color: var(--cerebro-critical); }
+tr.sevbar-important td:first-child { border-left-color: var(--cerebro-important); }
+tr.sevbar-moderate td:first-child { border-left-color: var(--cerebro-moderate); }
+tr.sevbar-low td:first-child { border-left-color: var(--cerebro-low); }
+tr.sevbar-unknown td:first-child { border-left-color: var(--cerebro-unknown); }
+
+/* state / role / scope pills */
+
+.state,
+.role,
+.scope {
+    display: inline-block;
+    padding: 0.08rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    border: 1px solid var(--cerebro-border);
+    color: var(--cerebro-muted);
+    text-transform: capitalize;
+}
+
+.state-running { color: var(--cerebro-online); border-color: rgba(69, 192, 126, 0.4); background: rgba(69, 192, 126, 0.1); }
+.state-exited,
+.state-stopped,
+.state-dead { color: var(--cerebro-down); border-color: rgba(229, 71, 95, 0.4); background: rgba(229, 71, 95, 0.1); }
+.state-paused,
+.state-created,
+.state-restarting { color: var(--cerebro-moderate); border-color: rgba(217, 177, 38, 0.4); background: rgba(217, 177, 38, 0.1); }
+
+.role-public { color: var(--cerebro-warn); border-color: rgba(238, 138, 60, 0.4); }
+.role-tailnet { color: var(--cerebro-accent); border-color: rgba(91, 157, 255, 0.4); }
+.role-private { color: var(--cerebro-low); border-color: rgba(76, 169, 119, 0.4); }
+
+.scope-public { color: var(--cerebro-warn); border-color: rgba(238, 138, 60, 0.4); background: rgba(238, 138, 60, 0.1); }
+.scope-local { color: var(--cerebro-muted); }
+
+.port {
     display: inline-block;
     margin: 0.1rem 0.2rem 0.1rem 0;
-    padding: 0.1rem 0.5rem;
+    padding: 0.08rem 0.45rem;
     border-radius: 4px;
     background: var(--cerebro-surface-alt);
     border: 1px solid var(--cerebro-border);
-    font-size: 0.78rem;
-}
-
-.chip {
-    display: inline-block;
-    padding: 0.1rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #0f1115;
-    text-transform: capitalize;
-}
-
-.sev-critical { background: var(--cerebro-critical); color: #fff; }
-.sev-important { background: var(--cerebro-important); }
-.sev-moderate { background: var(--cerebro-moderate); }
-.sev-low { background: var(--cerebro-low); color: #fff; }
-.sev-unknown { background: var(--cerebro-unknown); color: #fff; }
-
-.health {
-    display: inline-block;
-    padding: 0.1rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    border: 1px solid var(--cerebro-border);
-    text-transform: capitalize;
-}
-
-.health-online { color: var(--cerebro-online); }
-.health-needs_reauth { color: var(--cerebro-warn); }
-.health-unreachable { color: var(--cerebro-down); }
-.health-unknown { color: var(--cerebro-muted); }
-
-.muted {
-    color: var(--cerebro-muted);
-}
-
-.error {
-    color: var(--cerebro-banner-text);
-    background: var(--cerebro-banner);
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-}
-
-.mono {
     font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
 }
 
-.card {
-    background: var(--cerebro-surface);
-    border: 1px solid var(--cerebro-border);
-    border-radius: 8px;
-    padding: 0.85rem 1rem;
-    margin: 0.6rem 0;
+.port-exposed {
+    color: var(--cerebro-warn);
+    border-color: rgba(238, 138, 60, 0.5);
+    background: rgba(238, 138, 60, 0.1);
 }
 
-.card p {
-    margin: 0.35rem 0;
+.legend {
+    margin-top: 0.6rem;
 }
+
+.legend .port {
+    margin-right: 0.3rem;
+}
+
+/* --------------------------------------------------------------- facts dl */
 
 dl.facts {
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: 0.3rem 1rem;
+    gap: 0.4rem 1.25rem;
     margin: 0.5rem 0;
+    background: var(--cerebro-surface);
+    border: 1px solid var(--cerebro-border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1.1rem;
 }
 
 dl.facts dt {
@@ -215,9 +877,4 @@ dl.facts dt {
 
 dl.facts dd {
     margin: 0;
-}
-
-ul.mono {
-    margin: 0.3rem 0;
-    padding-left: 1.2rem;
 }

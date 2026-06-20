@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Cerebro{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%235b9dff'/></svg>">
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body data-refresh="30">
+<header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>Cerebro</a>
+    <nav class="nav">
+        <a href="/" class="{{ 'active' if active == 'fleet' else '' }}">Fleet</a>
+        <a href="/audit" class="{{ 'active' if active == 'audit' else '' }}">Audit</a>
+    </nav>
+    <div class="topbar-right">
+        {% if read_only %}<span class="badge readonly" title="No mutating actions are permitted">read-only</span>{% endif %}
+        <span class="badge local" title="Bound to 127.0.0.1 only">localhost</span>
+    </div>
+</header>
+<div class="banner" role="note">Local control plane — bound to loopback, do not expose to the network.</div>
+<main class="content" id="content">
+{% block content %}{% endblock %}
+</main>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

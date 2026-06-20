@@ -1,57 +1,55 @@
 (function () {
     "use strict";
 
-    function initTabs() {
+    function fromHash() {
+        return (window.location.hash || "").replace(/^#/, "");
+    }
+
+    function activate(name) {
+        var panels = document.querySelectorAll("[data-panel]");
+        var matched = false;
+        panels.forEach(function (panel) {
+            var on = panel.getAttribute("data-panel") === name;
+            panel.classList.toggle("active", on);
+            if (on) matched = true;
+        });
+        if (!matched) return false;
+        document.querySelectorAll(".tab[data-tab]").forEach(function (tab) {
+            var on = tab.getAttribute("data-tab") === name;
+            tab.classList.toggle("active", on);
+            tab.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        return true;
+    }
+
+    // Activate the tab named in the URL hash, falling back to the first tab.
+    function applyInitial() {
         var bar = document.querySelector("[data-tabs]");
         if (!bar) return;
-        var tabs = Array.prototype.slice.call(document.querySelectorAll("[data-tab]"));
-        var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
-
-        function activate(name) {
-            var matched = false;
-            panels.forEach(function (panel) {
-                var on = panel.getAttribute("data-panel") === name;
-                panel.classList.toggle("active", on);
-                if (on) matched = true;
-            });
-            if (!matched) return false;
-            tabs.forEach(function (tab) {
-                if (!tab.classList.contains("tab")) return;
-                var on = tab.getAttribute("data-tab") === name;
-                tab.classList.toggle("active", on);
-                tab.setAttribute("aria-selected", on ? "true" : "false");
-            });
-            return true;
-        }
-
-        function fromHash() {
-            return (window.location.hash || "").replace(/^#/, "");
-        }
-
+        if (activate(fromHash())) return;
         var first = bar.querySelector(".tab");
-        if (!activate(fromHash()) && first) {
-            activate(first.getAttribute("data-tab"));
-        }
-
-        document.addEventListener("click", function (event) {
-            var link = event.target.closest("[data-tab]");
-            if (!link) return;
-            var name = link.getAttribute("data-tab");
-            if (activate(name)) {
-                event.preventDefault();
-                if (window.history.replaceState) {
-                    window.history.replaceState(null, "", "#" + name);
-                } else {
-                    window.location.hash = name;
-                }
-            }
-        });
-
-        window.addEventListener("hashchange", function () {
-            var name = fromHash();
-            if (name) activate(name);
-        });
+        if (first) activate(first.getAttribute("data-tab"));
     }
+
+    // Bind once at module scope: delegation survives in-place content swaps.
+    document.addEventListener("click", function (event) {
+        var link = event.target.closest("[data-tab]");
+        if (!link) return;
+        var name = link.getAttribute("data-tab");
+        if (activate(name)) {
+            event.preventDefault();
+            if (window.history.replaceState) {
+                window.history.replaceState(null, "", "#" + name);
+            } else {
+                window.location.hash = name;
+            }
+        }
+    });
+
+    window.addEventListener("hashchange", function () {
+        var name = fromHash();
+        if (name) activate(name);
+    });
 
     function initRefresh() {
         var seconds = parseInt(document.body.getAttribute("data-refresh") || "0", 10);
@@ -72,7 +70,7 @@
                     var current = document.getElementById("content");
                     if (fresh && current) {
                         current.innerHTML = fresh.innerHTML;
-                        initTabs();
+                        applyInitial();
                     }
                 })
                 .catch(function () {
@@ -82,7 +80,7 @@
     }
 
     function start() {
-        initTabs();
+        applyInitial();
         initRefresh();
     }
 

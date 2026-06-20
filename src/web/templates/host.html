@@ -19,7 +19,7 @@
 {% if host.auth_url %}<div class="alert alert-warn">Needs re-authentication — <a href="{{ host.auth_url }}" rel="noopener noreferrer">open the Tailscale login</a></div>{% endif %}
 
 <nav class="tabs" data-tabs>
-    <a class="tab" data-tab="overview" href="#overview">Overview</a>
+    <a class="tab active" data-tab="overview" href="#overview" aria-selected="true">Overview</a>
     <a class="tab" data-tab="security" href="#security">Security{% if stats.severity.total %} <span class="tab-count {{ 'is-bad' if stats.severity.critical else ('is-warn' if stats.severity.important else '') }}">{{ stats.severity.total }}</span>{% endif %}</a>
     <a class="tab" data-tab="firewall" href="#firewall">Firewall</a>
     <a class="tab" data-tab="containers" href="#containers">Containers{% if stats.containers_total %} <span class="tab-count">{{ stats.containers_total }}</span>{% endif %}</a>
@@ -28,8 +28,8 @@
     <a class="tab" data-tab="updates" href="#updates">Updates{% if stats.updates_total %} <span class="tab-count {{ 'is-warn' if stats.security_updates else '' }}">{{ stats.updates_total }}</span>{% endif %}</a>
 </nav>
 
-{# ---------------------------------------------------------------- Overview #}
-<section class="panel" data-panel="overview">
+{# Overview is rendered active so the page has visible content before app.js runs. #}
+<section class="panel active" data-panel="overview">
     <div class="tile-grid">
         <div class="tile">
             <span class="tile-label">Security findings</span>
@@ -173,7 +173,7 @@
                 <td><span class="state state-{{ c.state }}">{{ c.state }}</span></td>
                 <td>
                     {% for p in c.ports %}
-                    <span class="port {{ 'port-exposed' if p.host_ip in ['0.0.0.0', '::', '*'] }}">{% if p.host_port %}{{ p.host_ip or "" }}{% if p.host_ip %}:{% endif %}{{ p.host_port }}→{% endif %}{{ p.container_port }}/{{ p.protocol }}</span>
+                    <span class="port {{ 'port-exposed' if p.host_ip in ['0.0.0.0', '::', '::0', '*'] }}">{% if p.host_port %}{{ p.host_ip or "" }}{% if p.host_ip %}:{% endif %}{{ p.host_port }}→{% endif %}{{ p.container_port }}/{{ p.protocol }}</span>
                     {% endfor %}
                     {% if not c.ports %}<span class="subtle">—</span>{% endif %}
                 </td>

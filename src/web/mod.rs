@@ -49,10 +49,10 @@ struct SeverityCounts {
 }
 
 impl SeverityCounts {
-    fn from_findings(findings: &[Finding]) -> Self {
+    fn from_severities(severities: impl IntoIterator<Item = Severity>) -> Self {
         let mut c = Self::default();
-        for finding in findings {
-            match finding.severity {
+        for severity in severities {
+            match severity {
                 Severity::Critical => c.critical += 1,
                 Severity::Important => c.important += 1,
                 Severity::Moderate => c.moderate += 1,
@@ -62,6 +62,10 @@ impl SeverityCounts {
             c.total += 1;
         }
         c
+    }
+
+    fn from_findings(findings: &[Finding]) -> Self {
+        Self::from_severities(findings.iter().map(|f| f.severity))
     }
 
     fn add(&mut self, other: &Self) {
@@ -356,8 +360,10 @@ fn fmt_uptime(secs: u64) -> String {
         format!("{days}d {hours}h")
     } else if hours > 0 {
         format!("{hours}h {mins}m")
-    } else {
+    } else if mins > 0 {
         format!("{mins}m")
+    } else {
+        "<1m".to_string()
     }
 }
 
@@ -446,8 +452,7 @@ async fn audit(State(state): State<AppState>) -> Html<String> {
         }
     }
     rows.sort_by_key(|row| std::cmp::Reverse(row.finding.severity));
-    let severity =
-        SeverityCounts::from_findings(&rows.iter().map(|r| r.finding.clone()).collect::<Vec<_>>());
+    let severity = SeverityCounts::from_severities(rows.iter().map(|r| r.finding.severity));
     render(
         "audit",
         context! {

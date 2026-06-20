@@ -12,11 +12,12 @@ use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
+use chrono::{DateTime, Utc};
 use minijinja::{context, Environment};
 use serde::Serialize;
 use tokio::sync::RwLock;
 
-use crate::model::HostView;
+use crate::model::{Finding, FirewallState, HostView, Severity};
 
 /// Shared application state handed to every request handler.
 #[derive(Clone)]
@@ -36,31 +37,225 @@ impl AppState {
     }
 }
 
-/// One row of the overview table: the per-host summary the landing page renders.
+/// A breakdown of findings by severity, used wherever the UI shows a "risk" summary.
+#[derive(Serialize, Default, Clone, Copy)]
+struct SeverityCounts {
+    critical: usize,
+    important: usize,
+    moderate: usize,
+    low: usize,
+    unknown: usize,
+    total: usize,
+}
+
+impl SeverityCounts {
+    fn from_findings(findings: &[Finding]) -> Self {
+        let mut c = Self::default();
+        for finding in findings {
+            match finding.severity {
+                Severity::Critical => c.critical += 1,
+                Severity::Important => c.important += 1,
+                Severity::Moderate => c.moderate += 1,
+                Severity::Low => c.low += 1,
+                Severity::Unknown => c.unknown += 1,
+            }
+            c.total += 1;
+        }
+        c
+    }
+
+    fn add(&mut self, other: &Self) {
+        self.critical += other.critical;
+        self.important += other.important;
+        self.moderate += other.moderate;
+        self.low += other.low;
+        self.unknown += other.unknown;
+        self.total += other.total;
+    }
+}
+
+/// One card on the fleet landing page.
 #[derive(Serialize)]
 struct HostSummary {
     name: String,
     groups: Vec<String>,
     health: crate::model::HostHealth,
     security_update_count: usize,
-    max_severity: Option<crate::model::Severity>,
+    severity: SeverityCounts,
     container_count: usize,
     last_polled: Option<String>,
 }
 
 impl HostSummary {
     fn from_host(host: &HostView) -> Self {
+        let findings = host.audit.as_ref().map(|a| a.findings.as_slice());
         Self {
             name: host.name.clone(),
             groups: host.groups.clone(),
             health: host.health,
             security_update_count: host.security_update_count(),
-            max_severity: host
-                .audit
-                .as_ref()
-                .map(crate::model::AuditReport::max_severity),
+            severity: findings
+                .map(SeverityCounts::from_findings)
+                .unwrap_or_default(),
             container_count: host.containers.len(),
-            last_polled: host.last_polled.map(|ts| ts.to_rfc3339()),
+            last_polled: host.last_polled.map(rel_time),
+        }
+    }
+}
+
+/// Fleet-wide totals shown in the header strip above the host cards.
+#[derive(Serialize, Default)]
+struct FleetSummary {
+    total: usize,
+    online: usize,
+    needs_reauth: usize,
+    unreachable: usize,
+    unknown: usize,
+    severity: SeverityCounts,
+    security_updates: usize,
+    containers: usize,
+}
+
+impl FleetSummary {
+    fn from_hosts(hosts: &[HostView]) -> Self {
+        let mut s = Self {
+            total: hosts.len(),
+            ..Self::default()
+        };
+        for host in hosts {
+            match host.health {
+                crate::model::HostHealth::Online => s.online += 1,
+                crate::model::HostHealth::NeedsReauth => s.needs_reauth += 1,
+                crate::model::HostHealth::Unreachable => s.unreachable += 1,
+                crate::model::HostHealth::Unknown => s.unknown += 1,
+            }
+            if let Some(audit) = &host.audit {
+                s.severity
+                    .add(&SeverityCounts::from_findings(&audit.findings));
+            }
+            s.security_updates += host.security_update_count();
+            s.containers += host.containers.len();
+        }
+        s
+    }
+}
+
+/// At-a-glance counters rendered on a host's Overview tab.
+#[derive(Serialize)]
+struct HostStats {
+    severity: SeverityCounts,
+    containers_total: usize,
+    containers_running: usize,
+    containers_exposed: usize,
+    security_updates: usize,
+    updates_total: usize,
+    cron_total: usize,
+    socket_total: usize,
+    wildcard_sockets: usize,
+    os: Option<String>,
+    uptime: Option<String>,
+}
+
+impl HostStats {
+    fn from_host(host: &HostView) -> Self {
+        let findings = host
+            .audit
+            .as_ref()
+            .map_or(&[][..], |a| a.findings.as_slice());
+        Self {
+            severity: SeverityCounts::from_findings(findings),
+            containers_total: host.containers.len(),
+            containers_running: host
+                .containers
+                .iter()
+                .filter(|c| c.state.eq_ignore_ascii_case("running"))
+                .count(),
+            containers_exposed: host
+                .containers
+                .iter()
+                .filter(|c| c.is_publicly_exposed())
+                .count(),
+            security_updates: host.security_update_count(),
+            updates_total: host.updates.len(),
+            cron_total: host.cron.len(),
+            socket_total: host.sockets.len(),
+            wildcard_sockets: host.sockets.iter().filter(|s| s.is_wildcard()).count(),
+            os: host
+                .facts
+                .as_ref()
+                .map(|f| f.os.pretty_name.clone().unwrap_or_else(|| f.os.id.clone())),
+            uptime: host
+                .facts
+                .as_ref()
+                .and_then(|f| f.uptime_secs)
+                .map(fmt_uptime),
+        }
+    }
+}
+
+/// A single opening in a firewall zone, rendered as a friendly chip.
+#[derive(Serialize)]
+struct Opening {
+    label: String,
+    detail: String,
+}
+
+/// A firewall zone translated into plain language for the Firewall tab.
+#[derive(Serialize)]
+struct ZoneView {
+    name: String,
+    default_policy: String,
+    permissive: bool,
+    applies_to: Vec<String>,
+    openings: Vec<Opening>,
+    rich_rules: Vec<String>,
+}
+
+/// The whole firewall, restated so an operator can read it without knowing firewalld.
+#[derive(Serialize)]
+struct FirewallView {
+    backend: String,
+    zones: Vec<ZoneView>,
+}
+
+impl FirewallView {
+    fn from_state(state: &FirewallState) -> Self {
+        let zones = state
+            .zones
+            .iter()
+            .map(|zone| {
+                let mut applies_to: Vec<String> = Vec::new();
+                applies_to.extend(zone.interfaces.iter().map(|i| format!("interface {i}")));
+                applies_to.extend(zone.sources.iter().map(|s| format!("source {s}")));
+
+                let mut openings: Vec<Opening> = Vec::new();
+                for service in &zone.services {
+                    openings.push(Opening {
+                        label: service_label(service).to_string(),
+                        detail: service.clone(),
+                    });
+                }
+                for port in &zone.ports {
+                    let endpoint = format!("{}/{}", port.port, port.protocol);
+                    openings.push(Opening {
+                        label: port_label(&port.port).unwrap_or("Port").to_string(),
+                        detail: endpoint,
+                    });
+                }
+
+                ZoneView {
+                    name: zone.name.clone(),
+                    default_policy: default_policy(zone.target.as_deref()).to_string(),
+                    permissive: matches!(zone.target.as_deref(), Some("ACCEPT")),
+                    applies_to,
+                    openings,
+                    rich_rules: zone.rich_rules.clone(),
+                }
+            })
+            .collect();
+        Self {
+            backend: format!("{:?}", state.backend).to_lowercase(),
+            zones,
         }
     }
 }
@@ -69,7 +264,101 @@ impl HostSummary {
 #[derive(Serialize)]
 struct AuditRow {
     host: String,
-    finding: crate::model::Finding,
+    finding: Finding,
+}
+
+/// Render a firewalld zone target as a one-line default policy in plain words.
+fn default_policy(target: Option<&str>) -> &'static str {
+    match target {
+        Some("ACCEPT") => "Accepts all inbound traffic",
+        Some("DROP") => "Silently drops unmatched traffic",
+        Some("%%REJECT%%" | "REJECT") => "Rejects unmatched traffic",
+        // firewalld's implicit default is to reject anything not explicitly allowed.
+        _ => "Rejects unmatched traffic (default)",
+    }
+}
+
+/// Friendly display name for a firewalld service identifier.
+fn service_label(service: &str) -> &str {
+    match service {
+        "ssh" => "SSH",
+        "http" => "HTTP",
+        "https" => "HTTPS",
+        "dns" => "DNS",
+        "dhcpv6-client" => "DHCPv6",
+        "cockpit" => "Cockpit",
+        "mysql" => "MySQL",
+        "postgresql" => "PostgreSQL",
+        "samba" => "Samba",
+        "nfs" => "NFS",
+        "smtp" => "SMTP",
+        "imaps" => "IMAPS",
+        "wireguard" => "WireGuard",
+        other => other,
+    }
+}
+
+/// Friendly name for a well-known port number (the input may be a range like `8000-8100`).
+fn port_label(port: &str) -> Option<&'static str> {
+    let number = port.split('-').next().and_then(|p| p.parse::<u16>().ok())?;
+    Some(match number {
+        22 => "SSH",
+        25 => "SMTP",
+        53 => "DNS",
+        80 => "HTTP",
+        443 => "HTTPS",
+        3306 => "MySQL",
+        5432 => "PostgreSQL",
+        6379 => "Redis",
+        8080 | 8443 => "Web",
+        27017 => "MongoDB",
+        _ => return None,
+    })
+}
+
+/// Findings sorted most-urgent first, for the security views.
+fn findings_by_severity(host: &HostView) -> Vec<Finding> {
+    let mut findings = host
+        .audit
+        .as_ref()
+        .map(|a| a.findings.clone())
+        .unwrap_or_default();
+    findings.sort_by_key(|f| std::cmp::Reverse(f.severity));
+    findings
+}
+
+/// A coarse "x minutes ago" rendering of a poll timestamp.
+fn rel_time(ts: DateTime<Utc>) -> String {
+    let secs = (Utc::now() - ts).num_seconds();
+    if secs < 5 {
+        return "just now".to_string();
+    }
+    if secs < 60 {
+        return format!("{secs}s ago");
+    }
+    let mins = secs / 60;
+    if mins < 60 {
+        return format!("{mins}m ago");
+    }
+    let hours = mins / 60;
+    if hours < 24 {
+        return format!("{hours}h ago");
+    }
+    format!("{}d ago", hours / 24)
+}
+
+/// Compact uptime such as `3d 4h` or `12m`.
+fn fmt_uptime(secs: u64) -> String {
+    let days = secs / 86_400;
+    let hours = (secs % 86_400) / 3_600;
+    let mins = (secs % 3_600) / 60;
+    if days > 0 {
+        format!("{days}d {hours}h")
+    } else if hours > 0 {
+        format!("{hours}h {mins}m")
+    } else {
+        format!("{mins}m")
+    }
 }
 
 fn environment() -> &'static Environment<'static> {
@@ -80,6 +369,8 @@ fn environment() -> &'static Environment<'static> {
         // explicitly: every `{{ ... }}` is attacker-influenced (container names, cron
         // commands, image tags) and must never be rendered as raw markup.
         env.set_auto_escape_callback(|_| minijinja::AutoEscape::Html);
+        env.add_template("base", include_str!("templates/base.html"))
+            .expect("base template");
         env.add_template("overview", include_str!("templates/overview.html"))
             .expect("overview template");
         env.add_template("host", include_str!("templates/host.html"))
@@ -103,9 +394,15 @@ fn render(name: &str, ctx: minijinja::Value) -> Html<String> {
 async fn overview(State(state): State<AppState>) -> Html<String> {
     let fleet = state.fleet.read().await;
     let hosts: Vec<HostSummary> = fleet.iter().map(HostSummary::from_host).collect();
+    let summary = FleetSummary::from_hosts(&fleet);
     render(
         "overview",
-        context! { hosts => hosts, read_only => state.read_only },
+        context! {
+            hosts => hosts,
+            summary => summary,
+            read_only => state.read_only,
+            active => "fleet",
+        },
     )
 }
 
@@ -117,13 +414,19 @@ async fn host_detail(
     let Some(host) = fleet.iter().find(|h| h.name == name) else {
         return (StatusCode::NOT_FOUND, "unknown host").into_response();
     };
+    let findings = findings_by_severity(host);
+    let top_findings: Vec<Finding> = findings.iter().take(4).cloned().collect();
     render(
         "host",
         context! {
             host => host,
-            security_update_count => host.security_update_count(),
-            max_severity => host.audit.as_ref().map(crate::model::AuditReport::max_severity),
+            stats => HostStats::from_host(host),
+            findings => findings,
+            top_findings => top_findings,
+            firewall_view => host.firewall.as_ref().map(FirewallView::from_state),
+            last_polled => host.last_polled.map(rel_time),
             read_only => state.read_only,
+            active => "",
         },
     )
     .into_response()
@@ -143,9 +446,16 @@ async fn audit(State(state): State<AppState>) -> Html<String> {
         }
     }
     rows.sort_by_key(|row| std::cmp::Reverse(row.finding.severity));
+    let severity =
+        SeverityCounts::from_findings(&rows.iter().map(|r| r.finding.clone()).collect::<Vec<_>>());
     render(
         "audit",
-        context! { rows => rows, read_only => state.read_only },
+        context! {
+            rows => rows,
+            severity => severity,
+            read_only => state.read_only,
+            active => "audit",
+        },
     )
 }
 
@@ -160,6 +470,13 @@ async fn style() -> impl IntoResponse {
     )
 }
 
+async fn app_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript")],
+        include_str!("templates/app.js"),
+    )
+}
+
 /// Build the dashboard router with all routes wired to `state`.
 pub fn router(state: AppState) -> Router {
     Router::new()
@@ -168,6 +485,7 @@ pub fn router(state: AppState) -> Router {
         .route("/audit", get(audit))
         .route("/healthz", get(healthz))
         .route("/assets/style.css", get(style))
+        .route("/assets/app.js", get(app_js))
         .with_state(state)
 }
 

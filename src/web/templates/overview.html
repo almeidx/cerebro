@@ -1,60 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="30">
-    <title>Cerebro — fleet</title>
-    <link rel="stylesheet" href="/assets/style.css">
-</head>
-<body>
-<header class="topbar">
-    <div class="brand">Cerebro</div>
-    <nav class="nav">
-        <a href="/">Fleet</a>
-        <a href="/audit">Audit</a>
-    </nav>
-    {% if read_only %}<span class="badge readonly">read-only</span>{% endif %}
-</header>
-<div class="banner">localhost control plane — do not expose</div>
-<main class="content">
+{% extends "base" %}
+{% block title %}Cerebro — fleet{% endblock %}
+{% block content %}
+<div class="page-head">
     <h1>Fleet</h1>
-    {% if hosts %}
-    <table class="grid">
-        <thead>
-            <tr>
-                <th>Host</th>
-                <th>Groups</th>
-                <th>Health</th>
-                <th>Security updates</th>
-                <th>Audit</th>
-                <th>Containers</th>
-                <th>Last polled</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for host in hosts %}
-            <tr>
-                <td><a href="/host/{{ host.name }}">{{ host.name }}</a></td>
-                <td>
-                    {% for group in host.groups %}<span class="tag">{{ group }}</span>{% endfor %}
-                </td>
-                <td><span class="health health-{{ host.health }}">{{ host.health }}</span></td>
-                <td>{{ host.security_update_count }}</td>
-                <td>
-                    {% if host.max_severity %}
-                    <span class="chip sev-{{ host.max_severity }}">{{ host.max_severity }}</span>
-                    {% else %}<span class="muted">—</span>{% endif %}
-                </td>
-                <td>{{ host.container_count }}</td>
-                <td class="muted">{{ host.last_polled or "never" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="muted">No hosts in the inventory yet.</p>
-    {% endif %}
-</main>
-</body>
-</html>
+    <p class="subtle">{{ summary.total }} host{{ '' if summary.total == 1 else 's' }} under watch</p>
+</div>
+
+<section class="stat-row">
+    <div class="stat">
+        <span class="stat-num">{{ summary.online }}<span class="stat-of">/{{ summary.total }}</span></span>
+        <span class="stat-label">Online</span>
+    </div>
+    <div class="stat {{ 'stat-warn' if summary.needs_reauth }}">
+        <span class="stat-num">{{ summary.needs_reauth }}</span>
+        <span class="stat-label">Need re-auth</span>
+    </div>
+    <div class="stat {{ 'stat-bad' if summary.unreachable }}">
+        <span class="stat-num">{{ summary.unreachable }}</span>
+        <span class="stat-label">Unreachable</span>
+    </div>
+    <div class="stat {{ 'stat-bad' if summary.severity.critical }}">
+        <span class="stat-num">{{ summary.severity.critical }}</span>
+        <span class="stat-label">Critical findings</span>
+    </div>
+    <div class="stat {{ 'stat-warn' if summary.severity.important }}">
+        <span class="stat-num">{{ summary.severity.important }}</span>
+        <span class="stat-label">Important findings</span>
+    </div>
+    <div class="stat">
+        <span class="stat-num">{{ summary.security_updates }}</span>
+        <span class="stat-label">Security updates</span>
+    </div>
+</section>
+
+{% if hosts %}
+<section class="card-grid">
+    {% for host in hosts %}
+    <a class="host-card" href="/host/{{ host.name }}">
+        <div class="host-card-top">
+            <span class="dot dot-{{ host.health }}" aria-hidden="true"></span>
+            <span class="host-name">{{ host.name }}</span>
+            <span class="health-label health-{{ host.health }}">{{ host.health | replace("_", " ") }}</span>
+        </div>
+        {% if host.groups %}
+        <div class="host-groups">
+            {% for group in host.groups %}<span class="tag">{{ group }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="host-card-stats">
+            {% if host.severity.total %}
+                {% if host.severity.critical %}<span class="count-pill sev-critical">{{ host.severity.critical }} critical</span>{% endif %}
+                {% if host.severity.important %}<span class="count-pill sev-important">{{ host.severity.important }} important</span>{% endif %}
+                {% if not host.severity.critical and not host.severity.important %}<span class="count-pill sev-moderate">{{ host.severity.total }} finding{{ '' if host.severity.total == 1 else 's' }}</span>{% endif %}
+            {% else %}
+                <span class="count-pill clean">no findings</span>
+            {% endif %}
+            <span class="count-pill ghost">{{ host.container_count }} container{{ '' if host.container_count == 1 else 's' }}</span>
+            {% if host.security_update_count %}<span class="count-pill ghost">{{ host.security_update_count }} sec update{{ '' if host.security_update_count == 1 else 's' }}</span>{% endif %}
+        </div>
+        <div class="host-card-foot subtle">polled {{ host.last_polled or "never" }}</div>
+    </a>
+    {% endfor %}
+</section>
+{% else %}
+<div class="empty">
+    <p>No hosts in the inventory yet.</p>
+    <p class="subtle">Add hosts to <code>cerebro.toml</code> and restart the dashboard.</p>
+</div>
+{% endif %}
+{% endblock %}

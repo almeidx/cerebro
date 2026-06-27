@@ -20,7 +20,7 @@ name = "cerebro"
 path = "src/lib.rs"
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.103"
 thiserror = "2.0.18"
 async-trait = "0.1.89"
 serde = { version = "1.0.228", features = ["derive"] }

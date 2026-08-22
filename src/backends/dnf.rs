@@ -33,7 +33,9 @@ pub fn parse_check_update(raw: &str) -> Vec<OsUpdate> {
     }
 
     tokens
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .map(|chunk| {
             let (name, arch) = split_name_arch(chunk[0]);
             OsUpdate {

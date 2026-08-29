@@ -47,7 +47,7 @@ rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 similar = "3.2.0"
-open = "5.4.1"
+open = "5.4.2"
 chrono = { version = "0.4.45", features = ["serde"] }
 
 [dev-dependencies]

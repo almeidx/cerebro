@@ -10,44 +10,69 @@ use crate::model::{Errata, ErrataKind, OsUpdate, Severity};
 
 /// Parse `dnf --quiet check-update` output into a list of [`OsUpdate`].
 ///
-/// A leading `Last metadata expiration check` line, blank lines, and a trailing
-/// `Obsoleting Packages` section are all ignored. The remaining rows are
-/// `NAME.ARCH  EVR  REPO`. When a package's `NAME.ARCH` is wide, dnf wraps the
-/// row across two physical lines (the bare `NAME.ARCH`, then an indented
-/// `EVR  REPO`) — which it does whenever stdout is a pipe, as it is over SSH. To
-/// stay correct under wrapping we flatten every data line into a single token
-/// stream and group it into `(NAME.ARCH, EVR, REPO)` triples; wrapping changes
-/// line boundaries but never the token sequence. `NAME` and `ARCH` are split on
-/// the last dot of the first token.
+/// Accept `NAME.ARCH EVR REPO` rows, including a bare `NAME.ARCH` followed
+/// immediately by an indented `EVR REPO` continuation. Ignore diagnostic text
+/// and stop before the `Obsoleting Packages` section.
 pub fn parse_check_update(raw: &str) -> Vec<OsUpdate> {
-    let mut tokens: Vec<&str> = Vec::new();
+    let mut updates = Vec::new();
+    let mut pending_package = None;
     for line in raw.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with("Last metadata") {
-            continue;
-        }
-        if line.starts_with("Obsoleting Packages") {
+        if line.trim_start().starts_with("Obsoleting Packages") {
             break;
         }
-        tokens.extend(line.split_whitespace());
-    }
-
-    tokens
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .map(|chunk| {
-            let (name, arch) = split_name_arch(chunk[0]);
-            OsUpdate {
-                name,
-                arch,
-                current_version: None,
-                new_version: chunk[1].to_string(),
-                repo: Some(chunk[2].to_string()),
-                errata: None,
+        let previous_package = pending_package.take();
+        let columns: Vec<_> = line.split_whitespace().collect();
+        let (package, version, repo) = match columns.as_slice() {
+            [package] if is_package_arch(package) => {
+                pending_package = Some(*package);
+                continue;
             }
+            [package, version, repo] if is_package_arch(package) => (*package, *version, *repo),
+            [version, repo] if line.starts_with(char::is_whitespace) => {
+                let Some(package) = previous_package else {
+                    continue;
+                };
+                (package, *version, *repo)
+            }
+            _ => continue,
+        };
+        if !is_evr(version) {
+            continue;
+        }
+        let (name, arch) = split_name_arch(package);
+        updates.push(OsUpdate {
+            name,
+            arch,
+            current_version: None,
+            new_version: version.to_string(),
+            repo: Some(repo.to_string()),
+            errata: None,
+        });
+    }
+    updates
+}
+
+fn is_package_arch(package: &str) -> bool {
+    let Some((name, arch)) = package.rsplit_once('.') else {
+        return false;
+    };
+    !name.is_empty()
+        && !arch.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'))
+        && arch.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn is_evr(value: &str) -> bool {
+    let Some((version, release)) = value.rsplit_once('-') else {
+        return false;
+    };
+    !version.is_empty()
+        && !release.is_empty()
+        && value.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-' | ':' | '~' | '^')
         })
-        .collect()
 }
 
 /// Parse `dnf updateinfo list --available` output into a map keyed by bare
@@ -310,6 +335,53 @@ RLXA-2024:0005 newtype/Sec.   foo-1.0-1.el10.x86_64
         assert_eq!(updates[0].new_version, "1:1.46.0-1.el10");
         assert_eq!(updates[0].repo.as_deref(), Some("baseos"));
         assert_eq!(updates[1].name, "curl");
+    }
+
+    const SECURITY_NOTICES: &str =
+        "Security: kernel-core-6.12.0-211.53.1.el10_2.x86_64 is an installed security update
+Security: kernel-core-6.12.0-211.39.1.el10_2.x86_64 is the currently running version
+";
+
+    #[test]
+    fn security_notices_are_not_updates() {
+        assert!(parse_check_update(SECURITY_NOTICES).is_empty());
+    }
+
+    #[test]
+    fn diagnostics_do_not_corrupt_package_rows() {
+        let raw = format!(
+            "{SECURITY_NOTICES}bash.x86_64 5.2.26-3.el10 baseos\nWarning: metadata is stale\nNetworkManager-config-server.noarch\n    1:1.46.0-1.el10 baseos\n{SECURITY_NOTICES}curl.x86_64 8.9.1-5.el10_0 baseos\n"
+        );
+        let updates = parse_check_update(&raw);
+        assert_eq!(updates.len(), 3);
+        assert_eq!(updates[0].name, "bash");
+        assert_eq!(updates[1].name, "NetworkManager-config-server");
+        assert_eq!(updates[1].new_version, "1:1.46.0-1.el10");
+        assert_eq!(updates[2].name, "curl");
+    }
+
+    #[test]
+    fn malformed_rows_and_orphaned_continuations_are_skipped() {
+        let raw = "    1.0-1 baseos
+missing_arch 1.0-1 baseos
+.name 1.0-1 baseos
+name. 1.0-1 baseos
+bad.x86_64 installed security
+incomplete.x86_64
+Warning: metadata is stale
+    1.0-1 baseos
+not_indented.x86_64
+1.0-1 baseos
+blank_separated.x86_64
+
+    1.0-1 baseos
+extra.x86_64 1.0-1 baseos extra
+valid.name+suffix.x86_64 1:2.0~rc1^git-1.el10 baseos
+";
+        let updates = parse_check_update(raw);
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].name, "valid.name+suffix");
+        assert_eq!(updates[0].new_version, "1:2.0~rc1^git-1.el10");
     }
 
     #[test]

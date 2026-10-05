@@ -254,7 +254,7 @@ internal (active)
         let state = parsed();
         let public = state.zone("public").unwrap();
         assert_eq!(public.interfaces, vec!["eth0".to_string()]);
-        assert!(public.sources.is_empty());
+        assert_eq!(public.sources, [] as [String; 0]);
         assert!(public.services.contains(&"ssh".to_string()));
         assert!(public.services.contains(&"cockpit".to_string()));
         assert_eq!(public.target.as_deref(), Some("default"));
@@ -286,9 +286,9 @@ internal (active)
     fn rich_rules_do_not_leak_across_zones() {
         let state = parsed();
         let internal = state.zone("internal").unwrap();
-        assert!(internal.rich_rules.is_empty());
+        assert_eq!(internal.rich_rules, [] as [String; 0]);
         assert!(internal.services.contains(&"ssh".to_string()));
-        assert!(internal.ports.is_empty());
+        assert_eq!(internal.ports, []);
         assert_eq!(internal.interfaces, vec!["eth1".to_string()]);
     }
 
@@ -316,7 +316,7 @@ internal (active)
     #[test]
     fn empty_input_yields_no_zones() {
         let state = parse_list_all_zones("");
-        assert!(state.zones.is_empty());
+        assert_eq!(state.zones, []);
         assert_eq!(state.backend, FirewallBackend::Firewalld);
     }
 
@@ -340,8 +340,8 @@ internal (active)
         assert_eq!(diff.added_services, vec!["https".to_string()]);
         assert!(diff.removed_services.contains(&"cockpit".to_string()));
         assert!(diff.removed_services.contains(&"dhcpv6-client".to_string()));
-        assert!(diff.added_ports.is_empty());
-        assert!(diff.removed_ports.is_empty());
+        assert_eq!(diff.added_ports, []);
+        assert_eq!(diff.removed_ports, []);
     }
 
     #[test]
@@ -472,6 +472,6 @@ internal (active)
             zone: "public".to_string(),
             ..ZoneDiff::default()
         };
-        assert!(apply_argv("public", &diff, true).is_empty());
+        assert_eq!(apply_argv("public", &diff, true), [] as [Vec<String>; 0]);
     }
 }

@@ -656,7 +656,7 @@ mod tests {
                 sshd: None,
             };
             let report = audit_host("h", &inputs);
-            assert!(report.findings.is_empty());
+            assert_eq!(report.findings, []);
         }
     }
 
@@ -694,7 +694,7 @@ mod tests {
             sshd: Some(&sshd),
         };
         let report = audit_host("h", &inputs);
-        assert!(report.findings.is_empty());
+        assert_eq!(report.findings, []);
     }
 
     #[test]
@@ -716,6 +716,6 @@ mod tests {
             sshd: None,
         };
         let report = audit_host("h", &inputs);
-        assert!(report.findings.is_empty());
+        assert_eq!(report.findings, []);
     }
 }

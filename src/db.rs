@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn opens_in_memory_and_migrates() {
         let store = Store::open_in_memory().unwrap();
-        assert!(store.recent_audit(10).unwrap().is_empty());
+        assert_eq!(store.recent_audit(10).unwrap(), []);
     }
 
     #[test]

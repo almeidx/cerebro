@@ -71,7 +71,7 @@ async fn gather_assembles_full_view_and_audit() {
     assert_eq!(view.containers.len(), 1);
     assert!(view.containers[0].is_publicly_exposed());
     assert!(view.sockets.iter().any(|s| s.local_port == 5432));
-    assert!(!view.cron.is_empty());
+    assert_ne!(view.cron, []);
     assert_eq!(view.security_update_count(), 1);
     assert!(view.tailscale.as_ref().is_some_and(|t| t.online));
 

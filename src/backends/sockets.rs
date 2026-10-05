@@ -178,13 +178,13 @@ mod tests {
     #[test]
     fn skips_wildcard_port() {
         let raw = "tcp   LISTEN 0      128          0.0.0.0:*         0.0.0.0:*\n";
-        assert!(parse_ss(raw).is_empty());
+        assert_eq!(parse_ss(raw), []);
     }
 
     #[test]
     fn skips_blank_and_garbage_lines() {
         let raw = "\n   \nnot a socket line\n";
-        assert!(parse_ss(raw).is_empty());
+        assert_eq!(parse_ss(raw), []);
     }
 
     #[test]

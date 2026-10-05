@@ -235,10 +235,10 @@ oldpkg.x86_64   1.0-1.el10   baseos
 
     #[test]
     fn empty_check_update_yields_no_updates() {
-        assert!(parse_check_update("").is_empty());
-        assert!(
-            parse_check_update("Last metadata expiration check: 0:00:01 ago on Tue.\n\n")
-                .is_empty()
+        assert_eq!(parse_check_update(""), []);
+        assert_eq!(
+            parse_check_update("Last metadata expiration check: 0:00:01 ago on Tue.\n\n"),
+            []
         );
     }
 
@@ -344,7 +344,7 @@ Security: kernel-core-6.12.0-211.39.1.el10_2.x86_64 is the currently running ver
 
     #[test]
     fn security_notices_are_not_updates() {
-        assert!(parse_check_update(SECURITY_NOTICES).is_empty());
+        assert_eq!(parse_check_update(SECURITY_NOTICES), []);
     }
 
     #[test]

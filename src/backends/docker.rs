@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn blank_lines_are_skipped() {
         let containers = parse_ps("\n\n   \n").unwrap();
-        assert!(containers.is_empty());
+        assert_eq!(containers, []);
     }
 
     #[test]
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn compliant_config_has_no_findings() {
-        assert!(daemon_json_findings(COMPLIANT).is_empty());
+        assert_eq!(daemon_json_findings(COMPLIANT), []);
     }
 
     #[test]
@@ -379,7 +379,7 @@ mod tests {
             "userland-proxy": false,
             "no-new-privileges": true
         }"#;
-        assert!(daemon_json_findings(config).is_empty());
+        assert_eq!(daemon_json_findings(config), []);
     }
 
     #[test]

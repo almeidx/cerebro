@@ -251,13 +251,19 @@ SHELL=/bin/bash
     #[test]
     fn prose_comment_is_skipped() {
         let jobs = parse_user_crontab("deploy", "# some note about the box\n");
-        assert!(jobs.is_empty());
+        assert_eq!(jobs, []);
     }
 
     #[test]
     fn prose_comment_starting_with_digit_is_not_a_job() {
-        assert!(parse_user_crontab("deploy", "# 2024 was a good year for us\n").is_empty());
-        assert!(parse_user_crontab("deploy", "# 5 reasons to upgrade now please\n").is_empty());
+        assert_eq!(
+            parse_user_crontab("deploy", "# 2024 was a good year for us\n"),
+            []
+        );
+        assert_eq!(
+            parse_user_crontab("deploy", "# 5 reasons to upgrade now please\n"),
+            []
+        );
         // A genuine disabled job is still recognised.
         let jobs = parse_user_crontab("deploy", "#0 3 * * * /x.sh\n");
         assert_eq!(jobs.len(), 1);
@@ -268,7 +274,7 @@ SHELL=/bin/bash
     fn env_assignments_are_skipped() {
         let content = "SHELL=/bin/bash\nPATH=/usr/bin:/bin\nMAILTO=ops@example.com\n";
         let jobs = parse_user_crontab("deploy", content);
-        assert!(jobs.is_empty());
+        assert_eq!(jobs, []);
     }
 
     #[test]
@@ -361,13 +367,13 @@ PATH=/usr/lib/sysstat:/usr/sbin:/usr/sbin:/usr/bin:/sbin:/bin
     #[test]
     fn unknown_at_keyword_is_dropped() {
         let jobs = parse_user_crontab("deploy", "@never /usr/bin/never.sh\n");
-        assert!(jobs.is_empty());
+        assert_eq!(jobs, []);
     }
 
     #[test]
     fn schedule_with_no_command_is_dropped() {
         let jobs = parse_user_crontab("deploy", "* * * * *\n");
-        assert!(jobs.is_empty());
+        assert_eq!(jobs, []);
     }
 
     #[test]

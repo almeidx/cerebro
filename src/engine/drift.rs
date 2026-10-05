@@ -68,7 +68,7 @@ mod tests {
         assert_eq!(drift.host, "web-01");
         assert_eq!(drift.kind, SnapshotKind::Firewall);
         assert_eq!(drift.summary, "1 added, 1 removed");
-        assert!(!drift.diff.is_empty());
+        assert_ne!(drift.diff, "");
         assert!(drift.diff.contains('B'));
     }
 

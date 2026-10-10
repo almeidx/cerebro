@@ -13,6 +13,7 @@ use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
 use chrono::{DateTime, Utc};
+use minijinja::value::Serde;
 use minijinja::{context, Environment};
 use serde::Serialize;
 use tokio::sync::RwLock;
@@ -404,8 +405,8 @@ async fn overview(State(state): State<AppState>) -> Html<String> {
     render(
         "overview",
         context! {
-            hosts => hosts,
-            summary => summary,
+            hosts => Serde(hosts),
+            summary => Serde(summary),
             read_only => state.read_only,
             active => "fleet",
         },
@@ -425,11 +426,11 @@ async fn host_detail(
     render(
         "host",
         context! {
-            host => host,
-            stats => HostStats::from_host(host),
-            findings => findings,
-            top_findings => top_findings,
-            firewall_view => host.firewall.as_ref().map(FirewallView::from_state),
+            host => Serde(host),
+            stats => Serde(HostStats::from_host(host)),
+            findings => Serde(findings),
+            top_findings => Serde(top_findings),
+            firewall_view => Serde(host.firewall.as_ref().map(FirewallView::from_state)),
             last_polled => host.last_polled.map(rel_time),
             read_only => state.read_only,
             active => "",
@@ -456,8 +457,8 @@ async fn audit(State(state): State<AppState>) -> Html<String> {
     render(
         "audit",
         context! {
-            rows => rows,
-            severity => severity,
+            rows => Serde(rows),
+            severity => Serde(severity),
             read_only => state.read_only,
             active => "audit",
         },

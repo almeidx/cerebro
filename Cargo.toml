@@ -40,13 +40,13 @@ tokio = { version = "1.54.1", features = [
 ] }
 axum = "0.8.9"
 tower = { version = "0.5.3", features = ["util"] }
-minijinja = { version = "3.0.3", features = ["serde"] }
+minijinja = { version = "3.0.5", features = ["serde"] }
 rust-embed = "8.13.0"
 mime_guess = "2.0.5"
-rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.41.1", default-features = false, features = ["bundled"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
-similar = "3.2.0"
+similar = "3.2.1"
 open = "5.4.5"
 chrono = { version = "0.4.45", features = ["serde"] }
 
